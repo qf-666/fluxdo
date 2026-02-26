@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../constants.dart';
 import '../../cf_challenge_logger.dart';
 
@@ -76,11 +77,63 @@ class CookieJarService {
 
       _initialized = true;
       debugPrint('[CookieJar] Initialized with path: $cookiePath');
+
+      // 一次性迁移：v1 修复了 cookie domain 缺少前导点的问题，
+      // 旧 cookie 以 host-only 格式存储，与新的 domain cookie 格式冲突，
+      // 清除旧数据，用户需重新登录一次。
+      await _migrateCookieStorage();
     } catch (e) {
       debugPrint('[CookieJar] Failed to create persistent storage, using memory: $e');
       _cookieJar = CookieJar();
       _initialized = true;
     }
+  }
+
+  static const _migrationKey = 'cookie_domain_migration_v1';
+
+  /// 一次性迁移：读出所有 cookie，按 name+path 去重（优先保留 domain cookie），
+  /// 清空后重新存入，消除 hostCookies / domainCookies 的重复冲突。
+  Future<void> _migrateCookieStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_migrationKey) == true) return;
+
+    debugPrint('[CookieJar] Migrating cookie domain format...');
+    final jar = _cookieJar!;
+    final hosts = await _getRelatedHosts(Uri.parse(AppConstants.baseUrl).host);
+
+    // 按 host 读出所有 cookie
+    final collected = <Uri, List<io.Cookie>>{};
+    for (final host in hosts) {
+      final hostUri = Uri.parse('https://$host');
+      final cookies = await jar.loadForRequest(hostUri);
+      if (cookies.isNotEmpty) {
+        collected[hostUri] = cookies;
+      }
+    }
+
+    // 清空
+    await jar.deleteAll();
+
+    // 去重后重新存入：同 name+path 下优先保留 domain cookie
+    for (final entry in collected.entries) {
+      final sorted = [...entry.value]..sort((a, b) {
+        // domain cookie 排前面
+        if (a.domain != null && b.domain == null) return -1;
+        if (a.domain == null && b.domain != null) return 1;
+        return 0;
+      });
+      final seen = <String>{};
+      final deduped = <io.Cookie>[];
+      for (final cookie in sorted) {
+        if (seen.add('${cookie.name}|${cookie.path}')) {
+          deduped.add(cookie);
+        }
+      }
+      await jar.saveFromResponse(entry.key, deduped);
+    }
+
+    await prefs.setBool(_migrationKey, true);
+    debugPrint('[CookieJar] Migration complete, ${collected.values.fold<int>(0, (s, l) => s + l.length)} cookies processed');
   }
 
   // ---------------------------------------------------------------------------
@@ -124,10 +177,13 @@ class CookieJarService {
         String hostForUri = baseUri.host;
 
         if (rawDomain != null && rawDomain.isNotEmpty) {
+          // RFC 6265 §5.2.3: Domain=linux.do 等价于 Domain=.linux.do，
+          // 统一补上前导点，与 AppCookieManager.saveCookies 的规范化保持一致。
           if (rawDomain.startsWith('.')) {
             domainAttr = rawDomain;
             hostForUri = rawDomain.substring(1);
           } else {
+            domainAttr = '.$rawDomain';
             hostForUri = rawDomain;
           }
         }
@@ -305,8 +361,8 @@ class CookieJarService {
       final cookie = io.Cookie(name, value)
         ..path = path ?? '/';
 
-      if (domain != null && domain.startsWith('.')) {
-        cookie.domain = domain;
+      if (domain != null) {
+        cookie.domain = domain.startsWith('.') ? domain : '.$domain';
       }
       if (expires != null) {
         cookie.expires = expires;
