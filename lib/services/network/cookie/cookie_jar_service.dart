@@ -78,9 +78,8 @@ class CookieJarService {
       _initialized = true;
       debugPrint('[CookieJar] Initialized with path: $cookiePath');
 
-      // 一次性迁移：v1 修复了 cookie domain 缺少前导点的问题，
-      // 旧 cookie 以 host-only 格式存储，与新的 domain cookie 格式冲突，
-      // 清除旧数据，用户需重新登录一次。
+      // 一次性迁移：v2 规范化 domain 为前导点格式并去重，
+      // 消除 host-only 与 domain cookie 共存导致的冲突。
       await _migrateCookieStorage();
     } catch (e) {
       debugPrint('[CookieJar] Failed to create persistent storage, using memory: $e');
@@ -89,17 +88,19 @@ class CookieJarService {
     }
   }
 
-  static const _migrationKey = 'cookie_domain_migration_v1';
+  static const _migrationKey = 'cookie_domain_migration_v2';
 
-  /// 一次性迁移：读出所有 cookie，按 name+path 去重（优先保留 domain cookie），
-  /// 清空后重新存入，消除 hostCookies / domainCookies 的重复冲突。
+  /// 一次性迁移（v2）：读出所有 cookie，按 name+path 去重
+  /// （优先保留 domain cookie），清空后重新存入，
+  /// 消除旧版本 hostCookies / domainCookies 的重复冲突。
   Future<void> _migrateCookieStorage() async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool(_migrationKey) == true) return;
 
-    debugPrint('[CookieJar] Migrating cookie domain format...');
+    debugPrint('[CookieJar] Migrating cookie storage (v2)...');
     final jar = _cookieJar!;
-    final hosts = await _getRelatedHosts(Uri.parse(AppConstants.baseUrl).host);
+    final baseHost = Uri.parse(AppConstants.baseUrl).host;
+    final hosts = await _getRelatedHosts(baseHost);
 
     // 按 host 读出所有 cookie
     final collected = <Uri, List<io.Cookie>>{};
@@ -133,7 +134,9 @@ class CookieJarService {
     }
 
     await prefs.setBool(_migrationKey, true);
-    debugPrint('[CookieJar] Migration complete, ${collected.values.fold<int>(0, (s, l) => s + l.length)} cookies processed');
+    // 清除旧版迁移标记
+    await prefs.remove('cookie_domain_migration_v1');
+    debugPrint('[CookieJar] Migration v2 complete');
   }
 
   // ---------------------------------------------------------------------------
@@ -177,13 +180,13 @@ class CookieJarService {
         String hostForUri = baseUri.host;
 
         if (rawDomain != null && rawDomain.isNotEmpty) {
-          // RFC 6265 §5.2.3: Domain=linux.do 等价于 Domain=.linux.do，
-          // 统一补上前导点，与 AppCookieManager.saveCookies 的规范化保持一致。
           if (rawDomain.startsWith('.')) {
             domainAttr = rawDomain;
             hostForUri = rawDomain.substring(1);
           } else {
-            domainAttr = '.$rawDomain';
+            // 无前导点的 domain：保持 host-only（不加前导点），
+            // 与 dio 官方 cookie_jar 行为一致。
+            // WKWebView 的前导点需求由 syncToWebView 的 _resolveWebViewDomain 处理。
             hostForUri = rawDomain;
           }
         }
@@ -207,6 +210,18 @@ class CookieJarService {
         }
         if (wc.expiresDate != null) {
           cookie.expires = DateTime.fromMillisecondsSinceEpoch(wc.expiresDate!.toInt());
+        }
+
+        // 跳过已过期的 cookie：写入 CookieJar 会覆盖同名有效 cookie 后被自动移除
+        if (cookie.expires != null && cookie.expires!.isBefore(DateTime.now())) {
+          debugPrint('[CookieJar] syncFromWebView: 跳过已过期 cookie ${cookie.name}');
+          continue;
+        }
+
+        // 跳过空值的认证 cookie：防止覆盖 CookieJar 中的有效值
+        if (cookie.value.isEmpty && _isAuthCookie(cookie.name)) {
+          debugPrint('[CookieJar] syncFromWebView: 跳过空值认证 cookie ${cookie.name}');
+          continue;
         }
 
         final bucketUri = Uri(scheme: baseUri.scheme, host: hostForUri);
@@ -248,8 +263,12 @@ class CookieJarService {
         }
       }
 
-      // 清除 WebView 中现有的 cookie（主域 + 所有子域）
+      // 清除 WebView 中现有的 cookie
+      // 使用 deleteCookies（批量）保证 Android 上能正确清除 domain cookie；
+      // 再逐个 deleteCookie 精确清除子域 cookie（Apple 需要）。
+      await _webViewCookieManager.deleteCookies(url: WebUri(AppConstants.baseUrl));
       for (final host in relatedHosts) {
+        if (host == uri.host) continue; // 主域已通过 deleteCookies 清除
         final url = 'https://$host';
         final existing = await _webViewCookieManager.getCookies(url: WebUri(url));
         for (final wc in existing) {
@@ -425,6 +444,16 @@ class CookieJarService {
     try {
       await _cookieJar!.deleteAll();
       await _webViewCookieManager.deleteAllCookies();
+
+      // Apple 平台：同时清除 HTTPCookieStorage.shared，
+      // 否则 sharedCookiesEnabled=true 的 WebView 创建时会读到旧 cookie。
+      if (io.Platform.isMacOS || io.Platform.isIOS) {
+        try {
+          await _nativeCookieChannel.invokeMethod('clearCookies', AppConstants.baseUrl);
+        } catch (e) {
+          debugPrint('[CookieJar] HTTPCookieStorage clear failed: $e');
+        }
+      }
     } catch (e) {
       debugPrint('[CookieJar] Failed to clear cookies: $e');
     }
@@ -490,5 +519,10 @@ class CookieJarService {
 
   static String _stripLeadingDot(String domain) {
     return domain.startsWith('.') ? domain.substring(1) : domain;
+  }
+
+  /// 是否是认证关键 cookie（丢失会导致登出）
+  static bool _isAuthCookie(String name) {
+    return name == '_t' || name == '_forum_session';
   }
 }

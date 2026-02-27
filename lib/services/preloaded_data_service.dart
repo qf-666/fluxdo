@@ -528,8 +528,13 @@ class PreloadedDataService {
           return;
         }
         
-        // 确认是真正的登出
-        _onAuthInvalidCallback?.call();
+        // 只有明确返回 false（确认未登录）才触发登出
+        // null 表示验证被跳过（冷却期/超时/错误），不应视为登出
+        if (verifyResult == false) {
+          _onAuthInvalidCallback?.call();
+        } else {
+          debugPrint('[PreloadedData] WebView 验证被跳过，暂不处理');
+        }
       }
     } catch (e) {
       debugPrint('[PreloadedData] 检查登录失效失败: $e');
