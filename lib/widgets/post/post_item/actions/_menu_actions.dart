@@ -101,7 +101,38 @@ extension _MenuActions on _PostItemState {
                     widget.onShareAsImage!();
                   },
                 ),
+              // 打赏 LDC
               if (!isGuest) ...[
+                Builder(
+                  builder: (context) {
+                    final currentUser = ref.read(currentUserProvider).value;
+                    final isOwnPost = currentUser != null && currentUser.username == widget.post.username;
+                    final credentials = ref.read(ldcRewardCredentialsProvider).value;
+                    if (isOwnPost || widget.post.userId == null || credentials == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return ListTile(
+                      leading: Icon(Icons.volunteer_activism_rounded, color: theme.colorScheme.onSurface),
+                      title: const Text('打赏 LDC'),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        showLdcRewardSheet(
+                          context,
+                          RewardTargetInfo(
+                            userId: widget.post.userId!,
+                            username: widget.post.username,
+                            name: widget.post.name,
+                            avatarUrl: widget.post.getAvatarUrl(),
+                            topicId: widget.topicId,
+                            postId: widget.post.id,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            if (!isGuest) ...[
                 // 标记解决方案
                 if (widget.post.canAcceptAnswer || widget.post.canUnacceptAnswer)
                   ListTile(

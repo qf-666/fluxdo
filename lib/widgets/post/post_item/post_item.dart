@@ -26,6 +26,7 @@ import 'widgets/post_reaction_picker.dart';
 import 'widgets/post_flag_sheet.dart';
 import 'widgets/post_reaction_users_sheet.dart';
 import 'widgets/post_stamp_painter.dart';
+import '../../../modules/ldc_reward/ldc_reward.dart';
 
 part 'actions/_reaction_actions.dart';
 part 'actions/_bookmark_actions.dart';

@@ -517,6 +517,9 @@ class Post {
   // 帖子头部徽章
   final List<GrantedBadge>? badgesGranted; // 帖子头部显示的徽章
 
+  // 用户 ID（用于打赏等功能）
+  final int? userId;
+
   // 用户身份标识
   final bool moderator;          // 用户是否为版主
   final bool admin;              // 用户是否为管理员
@@ -569,6 +572,7 @@ class Post {
     this.userTitle,
     this.userStatus,
     this.badgesGranted,
+    this.userId,
     this.moderator = false,
     this.admin = false,
     this.groupModerator = false,
@@ -644,6 +648,7 @@ class Post {
       badgesGranted: (json['badges_granted'] as List<dynamic>?)
           ?.map((e) => GrantedBadge.fromJson(e as Map<String, dynamic>))
           .toList(),
+      userId: json['user_id'] as int?,
       moderator: json['moderator'] as bool? ?? false,
       admin: json['admin'] as bool? ?? false,
       groupModerator: json['group_moderator'] as bool? ?? false,
@@ -734,6 +739,7 @@ class Post {
     String? userTitle,
     UserStatus? userStatus,
     List<GrantedBadge>? badgesGranted,
+    int? userId,
     bool? moderator,
     bool? admin,
     bool? groupModerator,
@@ -786,6 +792,7 @@ class Post {
       userTitle: userTitle ?? this.userTitle,
       userStatus: userStatus ?? this.userStatus,
       badgesGranted: badgesGranted ?? this.badgesGranted,
+      userId: userId ?? this.userId,
       moderator: moderator ?? this.moderator,
       admin: admin ?? this.admin,
       groupModerator: groupModerator ?? this.groupModerator,

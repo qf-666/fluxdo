@@ -8,6 +8,7 @@ import '../providers/ldc_providers.dart';
 import '../providers/cdk_providers.dart';
 import '../widgets/ldc_balance_card.dart';
 import '../widgets/cdk_balance_card.dart';
+import '../modules/ldc_reward/ldc_reward.dart';
 
 class MetaversePage extends ConsumerStatefulWidget {
   const MetaversePage({super.key});
@@ -176,6 +177,11 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
                         // CDK 服务卡片
                         _buildCdkServiceItem(theme),
                         const SizedBox(height: 16),
+                        // LDC 打赏配置（仅在 LDC 已开启时显示）
+                        if (_ldcEnabled) ...[
+                          const LdcRewardConfigTile(),
+                          const SizedBox(height: 16),
+                        ],
                         // 更多服务占位符
                         _buildComingSoonItem(theme),
                         const SizedBox(height: 100), // 底部留白
