@@ -149,7 +149,7 @@ class _BrowsingHistoryPageState extends ConsumerState<BrowsingHistoryPage> {
                     ),
                   );
                 }
-                if (historyAsync.isLoading) {
+                if (historyAsync.isLoading && !historyAsync.hasError) {
                   return const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Center(child: CircularProgressIndicator()),

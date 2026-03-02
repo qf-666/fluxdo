@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/discourse/discourse_service.dart';
 import '../services/preloaded_data_service.dart';
@@ -22,6 +24,9 @@ final authStateProvider = StreamProvider<void>((ref) {
 /// 当前用户 Provider
 /// 优先使用预加载数据同步返回，避免启动时短暂显示未登录状态
 class CurrentUserNotifier extends AsyncNotifier<User?> {
+  static const String _cacheKey = 'current_user_cache';
+  static const String _cacheUserKey = 'current_user_cache_username';
+
   @override
   FutureOr<User?> build() {
     final service = ref.read(discourseServiceProvider);
@@ -32,7 +37,36 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
       _refreshUser(service, preloadedUser);
       return preloadedUser;
     }
-    return _loadUser(service);
+    return _loadUserWithCache(service);
+  }
+
+  Future<User?> _loadUserWithCache(DiscourseService service) async {
+    // 先尝试从 SP 读取缓存
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_cacheKey);
+    User? cachedUser;
+    if (cached != null) {
+      try {
+        final json = jsonDecode(cached) as Map<String, dynamic>;
+        cachedUser = User.fromCacheJson(json);
+      } catch (_) {
+        // 缓存损坏，忽略
+      }
+    }
+
+    try {
+      final user = await _loadUser(service);
+      if (user != null) {
+        _saveCache(prefs, user);
+        return user;
+      }
+      // 网络返回 null（未登录），返回 null
+      return cachedUser;
+    } catch (e) {
+      // 网络失败，返回缓存
+      if (cachedUser != null) return cachedUser;
+      rethrow;
+    }
   }
 
   Future<User?> _loadUser(DiscourseService service) async {
@@ -49,15 +83,30 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
     if (previous != null || state.hasValue) {
       state = AsyncValue.data(previous);
     }
-    final user = await _loadUser(service);
-    state = AsyncValue.data(user);
+    try {
+      final user = await _loadUser(service);
+      if (user != null) {
+        final prefs = await SharedPreferences.getInstance();
+        _saveCache(prefs, user);
+      }
+      state = AsyncValue.data(user ?? previous);
+    } catch (e, st) {
+      // 刷新失败，保留旧数据并标记错误状态（用于离线提示）
+      if (previous != null) {
+        // ignore: invalid_use_of_internal_member
+        state = AsyncValue<User?>.error(e, st).copyWithPrevious(AsyncValue.data(previous));
+      }
+    }
   }
 
   void _refreshUser(DiscourseService service, User preloadedUser) {
     Future(() async {
       final user = await service.getCurrentUser();
       if (user == null) return;
-      state = AsyncValue.data(_mergeUser(user, preloadedUser));
+      final merged = _mergeUser(user, preloadedUser);
+      final prefs = await SharedPreferences.getInstance();
+      _saveCache(prefs, merged);
+      state = AsyncValue.data(merged);
     });
   }
 
@@ -69,6 +118,17 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
       seenNotificationId: preloadedUser.seenNotificationId,
       notificationChannelPosition: preloadedUser.notificationChannelPosition,
     );
+  }
+
+  void _saveCache(SharedPreferences prefs, User user) {
+    prefs.setString(_cacheKey, jsonEncode(user.toCacheJson()));
+    prefs.setString(_cacheUserKey, user.username);
+  }
+
+  Future<void> clearCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheKey);
+    await prefs.remove(_cacheUserKey);
   }
 }
 
@@ -82,9 +142,80 @@ final systemUserAvatarTemplateProvider = FutureProvider<String?>((ref) async {
 });
 
 /// 用户统计数据 Provider
-final userSummaryProvider = FutureProvider<UserSummary?>((ref) async {
-  final service = ref.watch(discourseServiceProvider);
-  final user = await ref.watch(currentUserProvider.future);
-  if (user == null) return null;
-  return service.getUserSummary(user.username);
-});
+class UserSummaryNotifier extends AsyncNotifier<UserSummary?> {
+  static const String _cacheKey = 'user_summary_cache';
+  static const String _cacheUserKey = 'user_summary_cache_username';
+
+  @override
+  Future<UserSummary?> build() async {
+    final service = ref.watch(discourseServiceProvider);
+    final user = await ref.watch(currentUserProvider.future);
+    if (user == null) return null;
+
+    // 先尝试从 SP 读取缓存
+    final prefs = await SharedPreferences.getInstance();
+    final cachedUser = prefs.getString(_cacheUserKey);
+    // 切换账号时清除旧缓存
+    if (cachedUser != null && cachedUser != user.username) {
+      await _clearCache(prefs);
+    }
+
+    final cached = prefs.getString(_cacheKey);
+    UserSummary? cachedSummary;
+    if (cached != null) {
+      try {
+        final json = jsonDecode(cached) as Map<String, dynamic>;
+        cachedSummary = UserSummary.fromCacheJson(json);
+      } catch (_) {
+        // 缓存损坏，忽略
+      }
+    }
+
+    try {
+      final summary = await service.getUserSummary(user.username);
+      _saveCache(prefs, summary, user.username);
+      return summary;
+    } catch (e) {
+      if (cachedSummary != null) return cachedSummary;
+      rethrow;
+    }
+  }
+
+  Future<void> refresh() async {
+    final previous = state.value;
+    try {
+      final service = ref.read(discourseServiceProvider);
+      final user = ref.read(currentUserProvider).value;
+      if (user == null) return;
+
+      final summary = await service.getUserSummary(user.username, forceRefresh: true);
+      final prefs = await SharedPreferences.getInstance();
+      _saveCache(prefs, summary, user.username);
+      state = AsyncValue.data(summary);
+    } catch (e, st) {
+      // 刷新失败，保留旧数据并标记错误状态
+      if (previous != null) {
+        // ignore: invalid_use_of_internal_member
+        state = AsyncValue<UserSummary?>.error(e, st).copyWithPrevious(AsyncValue.data(previous));
+      }
+    }
+  }
+
+  void _saveCache(SharedPreferences prefs, UserSummary summary, String username) {
+    prefs.setString(_cacheKey, jsonEncode(summary.toCacheJson()));
+    prefs.setString(_cacheUserKey, username);
+  }
+
+  Future<void> clearCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await _clearCache(prefs);
+  }
+
+  Future<void> _clearCache(SharedPreferences prefs) async {
+    await prefs.remove(_cacheKey);
+    await prefs.remove(_cacheUserKey);
+  }
+}
+
+final userSummaryProvider =
+    AsyncNotifierProvider<UserSummaryNotifier, UserSummary?>(UserSummaryNotifier.new);

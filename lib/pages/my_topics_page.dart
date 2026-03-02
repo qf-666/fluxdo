@@ -148,7 +148,7 @@ class _MyTopicsPageState extends ConsumerState<MyTopicsPage> {
                     ),
                   );
                 }
-                if (myTopicsAsync.isLoading) {
+                if (myTopicsAsync.isLoading && !myTopicsAsync.hasError) {
                   return const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Center(child: CircularProgressIndicator()),

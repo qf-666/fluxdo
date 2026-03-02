@@ -149,7 +149,7 @@ class _BookmarksPageState extends ConsumerState<BookmarksPage> {
                     ),
                   );
                 }
-                if (bookmarksAsync.isLoading) {
+                if (bookmarksAsync.isLoading && !bookmarksAsync.hasError) {
                   return const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Center(child: CircularProgressIndicator()),

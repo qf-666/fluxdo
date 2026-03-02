@@ -103,6 +103,10 @@ Future<void> main() async {
   });
 
   runApp(ProviderScope(
+    // 禁用 Riverpod 3 默认的自动重试机制
+    // 默认会对所有失败的异步 provider 指数退避重试 10 次，
+    // 在网络不通时会造成大量无意义的重复请求
+    retry: (_, __) => null,
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
       aiSharedPreferencesProvider.overrideWithValue(prefs),

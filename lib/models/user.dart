@@ -215,6 +215,40 @@ class User {
     );
   }
 
+  /// 序列化为缓存 JSON（字段已处理过，直接存储）
+  Map<String, dynamic> toCacheJson() => {
+    'id': id,
+    'username': username,
+    'name': name,
+    'avatar_template': avatarTemplate,
+    'animated_avatar': animatedAvatar,
+    'trust_level': trustLevel,
+    'status': status != null ? {'description': status!.description, 'emoji': status!.emoji} : null,
+    'flair_url': flairUrl,
+    'flair_name': flairName,
+    'flair_bg_color': flairBgColor,
+    'flair_color': flairColor,
+    'gamification_score': gamificationScore,
+  };
+
+  /// 从缓存 JSON 恢复（不再调用 resolveUrl/fixHtml，直接读取）
+  factory User.fromCacheJson(Map<String, dynamic> json) {
+    return User(
+      id: json['id'] as int? ?? 0,
+      username: json['username'] as String? ?? '',
+      name: json['name'] as String?,
+      avatarTemplate: json['avatar_template'] as String?,
+      animatedAvatar: json['animated_avatar'] as String?,
+      trustLevel: json['trust_level'] as int? ?? 0,
+      status: json['status'] != null ? UserStatus.fromJson(json['status'] as Map<String, dynamic>) : null,
+      flairUrl: json['flair_url'] as String?,
+      flairName: json['flair_name'] as String?,
+      flairBgColor: json['flair_bg_color'] as String?,
+      flairColor: json['flair_color'] as String?,
+      gamificationScore: json['gamification_score'] as int?,
+    );
+  }
+
   /// 获取背景图 URL（优先 profile，其次 card）
   String? get backgroundUrl => profileBackgroundUploadUrl ?? cardBackgroundUploadUrl;
 
@@ -347,6 +381,28 @@ class UserSummary {
       mostLikedUsers: mostLiked.map((e) => SummaryUserWithCount.fromJson(e as Map<String, dynamic>)).toList(),
       topCategories: topCats.map((e) => SummaryCategory.fromJson(e as Map<String, dynamic>)).toList(),
       badges: badgesJson.map((e) => Badge.fromJson(e as Map<String, dynamic>)).toList(),
+    );
+  }
+
+  /// 序列化为缓存 JSON（只缓存四项统计数据）
+  Map<String, dynamic> toCacheJson() => {
+    'days_visited': daysVisited,
+    'posts_read_count': postsReadCount,
+    'likes_received': likesReceived,
+    'post_count': postCount,
+  };
+
+  /// 从缓存 JSON 恢复
+  factory UserSummary.fromCacheJson(Map<String, dynamic> json) {
+    return UserSummary(
+      daysVisited: json['days_visited'] as int? ?? 0,
+      postsReadCount: json['posts_read_count'] as int? ?? 0,
+      likesReceived: json['likes_received'] as int? ?? 0,
+      likesGiven: 0,
+      topicCount: 0,
+      postCount: json['post_count'] as int? ?? 0,
+      timeRead: 0,
+      bookmarkCount: 0,
     );
   }
 

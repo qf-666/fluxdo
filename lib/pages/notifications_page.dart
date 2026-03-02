@@ -91,7 +91,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                       ),
                     );
                   }
-                  if (notificationsAsync.isLoading) {
+                  if (notificationsAsync.isLoading && !notificationsAsync.hasError) {
                     return const Padding(
                       padding: EdgeInsets.all(16.0),
                       child: Center(child: CircularProgressIndicator()),

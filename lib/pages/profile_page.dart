@@ -62,7 +62,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           // 使用 refresh 在后台更新数据，不会触发 loading 状态，避免 UI 闪烁
           // 忽略返回值，因为我们只是触发后台刷新
           ref.read(currentUserProvider.notifier).refreshSilently().ignore();
-          ref.refresh(userSummaryProvider.future).ignore();
+          ref.read(userSummaryProvider.notifier).refresh();
         }
       }
     });
@@ -201,7 +201,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       // 返回后静默刷新数据
       if (mounted) {
         ref.read(currentUserProvider.notifier).refreshSilently().ignore();
-        ref.refresh(userSummaryProvider.future).ignore();
+        ref.read(userSummaryProvider.notifier).refresh();
       }
     }
   }
@@ -275,6 +275,33 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             const _ProfileHeader(),
             const SizedBox(height: 24),
             
+            // 有缓存但刷新失败时显示离线提示
+            if (userState.hasError && userState.hasValue && userState.value != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_off_rounded, size: 16, color: theme.colorScheme.onTertiaryContainer.withValues(alpha: 0.7)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '数据可能不是最新的，下拉刷新重试',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             if (isLoadingInitial)
               const Center(child: Padding(
                 padding: EdgeInsets.all(64),

@@ -22,6 +22,8 @@ class AppStateRefresher {
   }
 
   static Future<void> resetForLogout(WidgetRef ref) async {
+    ref.read(currentUserProvider.notifier).clearCache();
+    ref.read(userSummaryProvider.notifier).clearCache();
     ref.read(topicSortProvider.notifier).setSort(TopicListFilter.latest);
     refreshAll(ref);
     // 清理各 tab 的标签筛选

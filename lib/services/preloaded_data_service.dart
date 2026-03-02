@@ -363,11 +363,11 @@ class PreloadedDataService {
 
       final html = response.data as String;
       await _parsePreloadedDataFromHtml(html);
-      _loaded = true;
       debugPrint('[PreloadedData] 数据加载成功');
     } catch (e) {
       debugPrint('[PreloadedData] 加载失败: $e');
     } finally {
+      _loaded = true;
       _loading = false;
     }
   }
@@ -528,13 +528,13 @@ class PreloadedDataService {
       final tToken = await CookieJarService().getTToken();
       if (tToken != null && tToken.isNotEmpty) {
         debugPrint('[PreloadedData] 检测到登录失效：有 token 但没有 currentUser');
-        
+
         // 记录日志
         await AuthLogService().logAuthInvalid(
           source: 'preloaded_data',
           reason: '有 token 但没有 currentUser',
         );
-        
+
         // WebView 二次验证
         final verifyResult = await AuthVerifyService().verifyLoginStatus();
         if (verifyResult == true) {
@@ -542,7 +542,7 @@ class PreloadedDataService {
           await refresh(); // 重新加载预加载数据
           return;
         }
-        
+
         // 只有明确返回 false（确认未登录）才触发登出
         // null 表示验证被跳过（冷却期/超时/错误），不应视为登出
         if (verifyResult == false) {
