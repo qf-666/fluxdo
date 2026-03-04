@@ -258,21 +258,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             : null,
         centerTitle: false,
         actions: isLoggedIn ? [
-          // 刷新中 / 离线状态指示
-          if (_isRefreshing)
-            const IconButton(
-              icon: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              tooltip: '正在刷新...',
-              onPressed: null,
-            )
-          else if (isOffline)
+          // 刷新中 / 离线状态指示（固定占位，避免后方图标闪烁）
+          if (_isRefreshing || isOffline)
             IconButton(
-              icon: Icon(Icons.cloud_off_rounded, color: theme.colorScheme.outline),
-              tooltip: '数据可能不是最新的，下拉刷新重试',
+              icon: _isRefreshing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(Icons.cloud_off_rounded, color: theme.colorScheme.outline),
+              tooltip: _isRefreshing ? '正在刷新...' : '数据可能不是最新的，下拉刷新重试',
               onPressed: null,
             ),
           IconButton(

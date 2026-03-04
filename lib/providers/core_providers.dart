@@ -26,6 +26,8 @@ final authStateProvider = StreamProvider<void>((ref) {
 class CurrentUserNotifier extends AsyncNotifier<User?> {
   static const String _cacheKey = 'current_user_cache';
   static const String _cacheUserKey = 'current_user_cache_username';
+  static const Duration _refreshCooldown = Duration(minutes: 2);
+  DateTime? _lastRefreshTime;
 
   @override
   FutureOr<User?> build() {
@@ -79,7 +81,12 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
     return _mergeUser(user, preloadedUser);
   }
 
-  Future<void> refreshSilently() async {
+  /// 静默刷新，带冷却时间（默认 2 分钟内不重复请求）
+  Future<void> refreshSilently({bool force = false}) async {
+    if (!force && _lastRefreshTime != null &&
+        DateTime.now().difference(_lastRefreshTime!) < _refreshCooldown) {
+      return;
+    }
     final service = ref.read(discourseServiceProvider);
     final previous = state.value;
     if (previous != null || state.hasValue) {
@@ -87,6 +94,7 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
     }
     try {
       final user = await _loadUser(service);
+      _lastRefreshTime = DateTime.now();
       if (user != null) {
         final prefs = await SharedPreferences.getInstance();
         _saveCache(prefs, user);

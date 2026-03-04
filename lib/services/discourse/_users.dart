@@ -72,7 +72,7 @@ mixin _UsersMixin on _DiscourseServiceBase {
       return _cachedUserSummary!;
     }
 
-    final response = await _dio.get('/users/$username/summary.json');
+    final response = await _dio.get('/u/$username/summary.json');
     final summary = UserSummary.fromJson(response.data);
 
     _cachedUserSummary = summary;

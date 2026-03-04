@@ -353,7 +353,6 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
         // App 回到前台 — 停止后台保活 + 恢复所有频道 + 刷新通知
         BackgroundNotificationService().disable();
         MessageBusService().exitBackgroundMode();
-        ref.read(currentUserProvider.notifier).refreshSilently();
         ref.invalidate(notificationListProvider);
       });
     }
