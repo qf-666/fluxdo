@@ -20,6 +20,7 @@ class ConnectivityService {
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _retryTimer;
+  Timer? _disconnectDebounce;
 
   bool _isConnected = true;
   bool _initialized = false;
@@ -65,16 +66,24 @@ class ConnectivityService {
   }
 
   Future<void> _onConnectivityChanged(List<ConnectivityResult> results) async {
+    debugPrint('[Connectivity] onConnectivityChanged: $results');
     final hasNetwork = results.isNotEmpty &&
         !results.every((r) => r == ConnectivityResult.none);
 
     if (!hasNetwork) {
-      // 设备无网络连接
-      _setConnected(false);
+      // connectivity_plus 在启动/恢复时可能先发一个瞬态 [none]，
+      // 防抖 500ms 避免假断开通知。
+      _disconnectDebounce?.cancel();
+      _disconnectDebounce = Timer(const Duration(milliseconds: 500), () {
+        _setConnected(false);
+      });
       return;
     }
 
-    // 有网络连接，ping 服务器验证可达性
+    // 有网络事件到达，取消待定的断开防抖
+    _disconnectDebounce?.cancel();
+
+    // ping 服务器验证可达性
     final reachable = await pingServer();
     _setConnected(reachable);
   }
@@ -82,21 +91,20 @@ class ConnectivityService {
   /// ping 服务器验证可达性
   /// 返回 true 表示服务器可达
   ///
-  /// 判断逻辑：只要收到任何 HTTP 响应（包括 CF 403）就算可达，
-  /// 只有网络层异常（超时、DNS 失败、连接被拒）才算不可达。
+  /// 参考 Discourse 实现：响应状态码为 200 且内容为 "ok" 才算可达。
   Future<bool> pingServer() async {
     try {
-      await _pingDio.get(
+      final response = await _pingDio.get(
         '/srv/status',
-        options: Options(
-          // 接受任意状态码，不抛异常——CF 403 也算服务器可达
-          validateStatus: (_) => true,
-        ),
+        options: Options(validateStatus: (_) => true),
       );
-      return true;
+      return response.statusCode == 200 &&
+          response.data?.toString().trim() == 'ok';
     } on DioException catch (e) {
-      // 收到了 HTTP 响应但 Dio 仍然抛了异常（如重定向等），视为可达
-      if (e.response != null) return true;
+      if (e.response != null) {
+        return e.response!.statusCode == 200 &&
+            e.response!.data?.toString().trim() == 'ok';
+      }
       debugPrint('[Connectivity] ping 失败: ${e.type}');
       return false;
     } catch (e) {
@@ -106,6 +114,8 @@ class ConnectivityService {
   }
 
   void _setConnected(bool connected) {
+    // ping 确认已连接时，取消待定的断开防抖（即使状态未变也要取消）
+    if (connected) _disconnectDebounce?.cancel();
     if (_isConnected == connected) return;
     _isConnected = connected;
     _controller.add(connected);
@@ -118,15 +128,27 @@ class ConnectivityService {
     }
   }
 
-  /// 断开时每 5 秒重试
+  /// 断开时每 1 秒检查设备网络状态，有网才 ping 服务器
   void _startRetry() {
     _stopRetry();
-    _retryTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      final reachable = await pingServer();
-      if (reachable) {
-        _setConnected(true);
+    _retryTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      final result = await _connectivity.checkConnectivity();
+      final hasNetwork = result.isNotEmpty &&
+          !result.every((r) => r == ConnectivityResult.none);
+      if (hasNetwork) {
+        await _pingServerAndSetConnectivity();
+      } else {
+        debugPrint('[Connectivity] 设备无网络，跳过 ping');
       }
     });
+  }
+
+  /// ping 服务器，成功则标记恢复并停止重试
+  Future<void> _pingServerAndSetConnectivity() async {
+    final reachable = await pingServer();
+    if (reachable) {
+      _setConnected(true);
+    }
   }
 
   void _stopRetry() {
@@ -142,6 +164,7 @@ class ConnectivityService {
 
   void dispose() {
     _connectivitySub?.cancel();
+    _disconnectDebounce?.cancel();
     _stopRetry();
     _controller.close();
     _initialized = false;

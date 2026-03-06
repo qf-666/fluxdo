@@ -53,27 +53,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
-
-    // 进入页面后静默刷新用户数据（不触发 loading 状态）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final current = ref.read(currentUserProvider).value;
-        if (current != null) {
-          _silentRefresh();
-        }
-      }
-    });
-  }
-
-  /// 静默刷新（不显示 loading 指示器）
-  Future<void> _silentRefresh() async {
-    if (!mounted) return;
-    try {
-      await Future.wait([
-        ref.read(currentUserProvider.notifier).refreshSilently(),
-        ref.read(userSummaryProvider.notifier).refresh(),
-      ]);
-    } catch (_) {}
   }
 
   /// 下拉刷新（显示 loading 指示器）

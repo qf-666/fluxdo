@@ -32,7 +32,6 @@ class _PreheatGateState extends State<PreheatGate> {
 
       DiscourseService().getEnabledReactions();
       EmojiHandler().init();
-      DiscourseService().preloadUserSummary();
 
       _error = null;
       return true;

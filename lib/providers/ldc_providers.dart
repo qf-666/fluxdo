@@ -18,7 +18,7 @@ class LdcUserInfoNotifier extends AsyncNotifier<LdcUserInfo?> {
   @override
   Future<LdcUserInfo?> build() async {
     final prefs = await SharedPreferences.getInstance();
-    final currentUser = await ref.watch(currentUserProvider.future);
+    final currentUser = await ref.read(currentUserProvider.future);
     if (currentUser == null) {
       await _clearCache(prefs);
       return null;
@@ -27,24 +27,28 @@ class LdcUserInfoNotifier extends AsyncNotifier<LdcUserInfo?> {
 
     if (!enabled) return null;
 
+    // 先读取缓存，用于网络失败时兜底
+    LdcUserInfo? cachedInfo;
     final cached = prefs.getString(_cacheKey);
     if (cached != null) {
       try {
         final cachedUser = prefs.getString(_cacheUserKey);
         if (cachedUser != null && cachedUser != currentUser.username) {
           await _clearCache(prefs);
-          return await _fetchUserInfo();
+        } else {
+          cachedInfo = LdcUserInfo.fromJson(jsonDecode(cached) as Map<String, dynamic>);
         }
-        final json = jsonDecode(cached) as Map<String, dynamic>;
-        final cachedInfo = LdcUserInfo.fromJson(json);
-        refresh();
-        return cachedInfo;
-      } catch (e) {
-        // 缓存损坏，继续刷新
+      } catch (_) {
+        // 缓存损坏，忽略
       }
     }
 
-    return await _fetchUserInfo();
+    try {
+      return await _fetchUserInfo();
+    } catch (e) {
+      if (cachedInfo != null) return cachedInfo;
+      rethrow;
+    }
   }
 
   Future<LdcUserInfo?> _fetchUserInfo() async {

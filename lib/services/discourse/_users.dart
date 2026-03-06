@@ -82,21 +82,6 @@ mixin _UsersMixin on _DiscourseServiceBase {
     return summary;
   }
 
-  /// 预加载用户统计数据
-  Future<void> preloadUserSummary() async {
-    if (_username == null || _username!.isEmpty) {
-      await _loadStoredCredentials();
-    }
-    if (_username != null && _username!.isNotEmpty) {
-      try {
-        await getUserSummary(_username!, forceRefresh: true);
-        debugPrint('[DiscourseService] UserSummary preloaded');
-      } catch (e) {
-        debugPrint('[DiscourseService] Preload UserSummary failed: $e');
-      }
-    }
-  }
-
   /// 获取用户动态
   Future<UserActionResponse> getUserActions(String username, {String? filter, int offset = 0}) async {
     final queryParams = <String, dynamic>{
