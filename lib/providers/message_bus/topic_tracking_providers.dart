@@ -333,17 +333,18 @@ class MessageBusInitNotifier extends Notifier<void> {
       _allCallbacks.clear();
     }
     
-    if (currentUser == null) {
-      debugPrint('[MessageBusInit] 用户未登录，跳过订阅');
-      return;
-    }
-
-    // 配置 MessageBus 独立域名（从预加载数据获取）
+    // 对齐 Discourse：long_polling_base_url 对匿名和登录用户都生效，
+    // sharedSessionKey 仅在登录且跨域长轮询时存在。
     final preloaded = PreloadedDataService();
     messageBus.configure(
       baseUrl: preloaded.longPollingBaseUrl,
       sharedSessionKey: preloaded.sharedSessionKey,
     );
+
+    if (currentUser == null) {
+      debugPrint('[MessageBusInit] 用户未登录，仅配置公开频道轮询域名');
+      return;
+    }
 
     // 同步保存到 SharedPreferences 供 iOS 后台任务使用
     saveBackgroundMessageBusConfig(
