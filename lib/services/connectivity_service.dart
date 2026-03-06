@@ -10,7 +10,7 @@ import 'network/discourse_dio.dart';
 ///
 /// 参考 Discourse `NetworkConnectivity` 服务：
 /// - 监听设备网络状态变化（WiFi/移动数据断开/恢复）
-/// - 通过 ping `/srv/status` 验证服务器可达性
+/// - 可选通过 ping `/srv/status` 验证服务器可达性
 /// - 断开时定时重试，恢复后通知订阅者
 class ConnectivityService {
   static final ConnectivityService _instance = ConnectivityService._internal();
@@ -25,6 +25,9 @@ class ConnectivityService {
   bool _isConnected = true;
   bool _initialized = false;
   final _controller = StreamController<bool>.broadcast();
+
+  /// 是否启用服务器 ping 验证，false 时仅依赖本地网络状态检测
+  static const bool enableServerPing = false;
 
   /// 连接状态流（true = 已连接，false = 已断开）
   Stream<bool> get connectionStream => _controller.stream;
@@ -83,9 +86,12 @@ class ConnectivityService {
     // 有网络事件到达，取消待定的断开防抖
     _disconnectDebounce?.cancel();
 
-    // ping 服务器验证可达性
-    final reachable = await pingServer();
-    _setConnected(reachable);
+    if (enableServerPing) {
+      final reachable = await pingServer();
+      _setConnected(reachable);
+    } else {
+      _setConnected(true);
+    }
   }
 
   /// ping 服务器验证可达性
@@ -128,7 +134,7 @@ class ConnectivityService {
     }
   }
 
-  /// 断开时每 1 秒检查设备网络状态，有网才 ping 服务器
+  /// 断开时每 1 秒检查设备网络状态，有网时根据开关决定是否 ping 服务器
   void _startRetry() {
     _stopRetry();
     _retryTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
@@ -136,19 +142,16 @@ class ConnectivityService {
       final hasNetwork = result.isNotEmpty &&
           !result.every((r) => r == ConnectivityResult.none);
       if (hasNetwork) {
-        await _pingServerAndSetConnectivity();
+        if (enableServerPing) {
+          final reachable = await pingServer();
+          if (reachable) _setConnected(true);
+        } else {
+          _setConnected(true);
+        }
       } else {
-        debugPrint('[Connectivity] 设备无网络，跳过 ping');
+        debugPrint('[Connectivity] 设备无网络，等待重试');
       }
     });
-  }
-
-  /// ping 服务器，成功则标记恢复并停止重试
-  Future<void> _pingServerAndSetConnectivity() async {
-    final reachable = await pingServer();
-    if (reachable) {
-      _setConnected(true);
-    }
   }
 
   void _stopRetry() {
@@ -158,8 +161,15 @@ class ConnectivityService {
 
   /// 手动触发一次检查（如 App 回到前台时）
   Future<void> check() async {
-    final reachable = await pingServer();
-    _setConnected(reachable);
+    if (enableServerPing) {
+      final reachable = await pingServer();
+      _setConnected(reachable);
+    } else {
+      final result = await _connectivity.checkConnectivity();
+      final hasNetwork = result.isNotEmpty &&
+          !result.every((r) => r == ConnectivityResult.none);
+      _setConnected(hasNetwork);
+    }
   }
 
   void dispose() {

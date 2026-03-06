@@ -8,7 +8,7 @@ import 'cookie/app_cookie_manager.dart';
 import 'cookie/cookie_jar_service.dart';
 import 'cookie/cookie_sync_service.dart';
 import 'interceptors/cf_challenge_interceptor.dart';
-import 'interceptors/concurrency_interceptor.dart';
+import 'interceptors/request_scheduler_interceptor.dart';
 import 'interceptors/cronet_fallback_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/network_log_interceptor.dart';
@@ -42,7 +42,7 @@ class DiscourseDio {
 
     // 2. 并发限制（null 表示不限制）
     if (maxConcurrent != null) {
-      dio.interceptors.add(ConcurrencyInterceptor(maxConcurrent: maxConcurrent));
+      dio.interceptors.add(RequestSchedulerInterceptor(maxConcurrent: maxConcurrent));
     }
 
     // 3. Cookie 管理
