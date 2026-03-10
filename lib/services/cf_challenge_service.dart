@@ -22,9 +22,11 @@ class CfChallengeService {
   static DateTime? _lastToastAt;
   Completer<BuildContext>? _contextReadyCompleter;
 
-  /// 冷却机制：验证失败后进入冷却期
+  /// 冷却机制：连续失败 N 次后进入冷却期
   DateTime? _cooldownUntil;
+  int _consecutiveFailures = 0;
   static const _cooldownDuration = Duration(seconds: 30);
+  static const _maxFailuresBeforeCooldown = 3;
   static const _toastCooldown = Duration(seconds: 2);
 
   /// 检查是否在冷却期
@@ -37,16 +39,23 @@ class CfChallengeService {
     return true;
   }
 
-  /// 重置冷却期（验证成功后调用）
+  /// 重置冷却期和失败计数（验证成功后调用）
   void resetCooldown() {
     _cooldownUntil = null;
+    _consecutiveFailures = 0;
     CfChallengeLogger.logCooldown(entering: false);
   }
 
-  /// 手动启动冷却期
+  /// 记录一次验证失败，连续达到上限后进入冷却期
   void startCooldown() {
-    _cooldownUntil = DateTime.now().add(_cooldownDuration);
-    CfChallengeLogger.logCooldown(entering: true, until: _cooldownUntil);
+    _consecutiveFailures++;
+    if (_consecutiveFailures >= _maxFailuresBeforeCooldown) {
+      _cooldownUntil = DateTime.now().add(_cooldownDuration);
+      debugPrint('[CfChallenge] 连续失败 $_consecutiveFailures 次，进入 ${_cooldownDuration.inSeconds}s 冷却期');
+      CfChallengeLogger.logCooldown(entering: true, until: _cooldownUntil);
+    } else {
+      debugPrint('[CfChallenge] 验证失败 $_consecutiveFailures/$_maxFailuresBeforeCooldown，允许重试');
+    }
   }
 
   static void showGlobalMessage(String message, {bool isError = true}) {
@@ -458,6 +467,11 @@ class _CfChallengePageState extends State<CfChallengePage> {
       _checkCount++;
       if (!_isBackground) setState(() {}); // 更新计数显示
 
+      // 兜底轮询：验证通过后页面重定向会销毁 JS 上下文，
+      // 导致 onChallengeComplete 回调丢失（macOS 上尤为明显），
+      // 每秒主动检查 cf_clearance 变化来弥补
+      _pollCfClearance();
+
       if (_checkCount > _activeMaxCheckCount) {
         if (_isBackground) {
           CfChallengeLogger.log(
@@ -477,6 +491,41 @@ class _CfChallengePageState extends State<CfChallengePage> {
         }
       }
     });
+  }
+
+  /// 轮询检测 cf_clearance 变化（兜底 JS 回调被重定向吞掉的场景）
+  bool _polling = false;
+  Future<void> _pollCfClearance() async {
+    if (_hasPopped || _polling) return;
+    _polling = true;
+    try {
+      final cookie = await CookieManager.instance().getCookie(
+        url: WebUri(AppConstants.baseUrl),
+        name: 'cf_clearance',
+      );
+      if (_hasPopped) return;
+      if (cookie == null || cookie.value.isEmpty) return;
+
+      // 与初始快照对比，过滤旧值残留
+      if (_initialCfClearance != null &&
+          _initialCfClearance!.isNotEmpty &&
+          cookie.value == _initialCfClearance) {
+        return;
+      }
+
+      debugPrint('[CfChallenge] ✓ 轮询检测到新 cf_clearance (${cookie.value.length} chars)');
+      CfChallengeLogger.logVerifyResult(
+        success: true,
+        reason: 'polling detected new cf_clearance',
+      );
+      await CookieJarService().syncFromWebView();
+      _timeoutTimer?.cancel();
+      if (mounted) _finish(true);
+    } catch (e) {
+      debugPrint('[CfChallenge] 轮询检查异常: $e');
+    } finally {
+      _polling = false;
+    }
   }
 
   // ---------------------------------------------------------------------------
