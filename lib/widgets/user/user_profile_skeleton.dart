@@ -8,7 +8,9 @@ class UserProfileSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double expandedHeight = 410.0;
+    // 横屏时屏幕高度有限，限制 expandedHeight 不超过屏幕高度的 70%
+    final screenHeight = MediaQuery.of(context).size.height;
+    final double expandedHeight = 410.0.clamp(0.0, screenHeight * 0.7);
 
     return Scaffold(
       body: Skeleton(
@@ -88,8 +90,8 @@ class UserProfileSkeleton extends StatelessWidget {
         Container(color: Colors.black.withValues(alpha: 0.6)),
         // 内容
         Positioned(
-          left: 20,
-          right: 20,
+          left: 20 + MediaQuery.of(context).padding.left,
+          right: 20 + MediaQuery.of(context).padding.right,
           bottom: 36 + 24, // TabBar 高度 + 间距
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

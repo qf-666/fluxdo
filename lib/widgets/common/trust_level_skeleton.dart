@@ -42,7 +42,7 @@ class TrustLevelSkeleton extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      left: 20,
+                      left: 20 + MediaQuery.of(context).padding.left,
                       bottom: 20,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

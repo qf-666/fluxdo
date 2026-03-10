@@ -679,7 +679,9 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
     final hasBackground = bgUrl != null && bgUrl.isNotEmpty;
     // Standard toolbar height is usually 56.0 + status bar height
     final double pinnedHeight = kToolbarHeight + MediaQuery.of(context).padding.top;
-    final double expandedHeight = 410.0;
+    // 横屏时屏幕高度有限，限制 expandedHeight 不超过屏幕高度的 70%
+    final screenHeight = MediaQuery.of(context).size.height;
+    final double expandedHeight = 410.0.clamp(0.0, screenHeight * 0.7);
 
     // Check if there is any info to show (for the "About" popup)
     final hasBio = _user?.bio != null && _user!.bio!.isNotEmpty;
@@ -1119,8 +1121,8 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
 
               // ===== 层 3: 收起时的标题栏内容 - 收起时显示，点击展开 =====
               Positioned(
-                left: 60, // 增加间距，避免靠近返回按钮
-                right: 48,
+                left: 60 + MediaQuery.of(context).padding.left, // 横屏时需加上左侧安全区
+                right: 48 + MediaQuery.of(context).padding.right, // 横屏时需加上右侧安全区
                 bottom: 14 + 36, // 调整位置适应 TabBar (36是TabBar高度)
                 child: GestureDetector(
                   onTap: titleOpacity > 0.5 ? () {

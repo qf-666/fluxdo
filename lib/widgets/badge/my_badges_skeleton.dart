@@ -34,7 +34,7 @@ class MyBadgesSkeleton extends StatelessWidget {
                   children: [
                     // 统计信息骨架
                     Positioned(
-                      left: 20,
+                      left: 20 + MediaQuery.of(context).padding.left,
                       bottom: 20,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

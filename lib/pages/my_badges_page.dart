@@ -168,7 +168,7 @@ class _MyBadgesPageState extends ConsumerState<MyBadgesPage> {
                 ),
               ),
               Positioned(
-                left: 20,
+                left: 20 + MediaQuery.of(context).padding.left,
                 bottom: 20,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
