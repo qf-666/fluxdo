@@ -13,7 +13,7 @@ import '../common/relative_time_text.dart';
 import '../../utils/number_utils.dart';
 import '../common/emoji_text.dart';
 
-/// 话题卡片组件 — 紧凑横向布局
+/// 话题卡片组件 — 极限压缩单行布局版
 class TopicCard extends ConsumerWidget {
   final Topic topic;
   final VoidCallback? onTap;
@@ -44,11 +44,7 @@ class TopicCard extends ConsumerWidget {
     final categoryId = int.tryParse(topic.categoryId);
     final category = categoryMap?[categoryId];
 
-    // 图标逻辑优先级：
-    // 1. 本级 FA Icon
-    // 2. 本级 Logo
-    // 3. 父级 FA Icon
-    // 4. 父级 Logo
+    // 图标逻辑优先级
     IconData? faIcon = FontAwesomeHelper.getIcon(category?.icon);
     String? logoUrl = category?.uploadedLogo;
 
@@ -59,16 +55,17 @@ class TopicCard extends ConsumerWidget {
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 1), // 极限外部间距
       clipBehavior: Clip.antiAlias,
+      elevation: 0,
       color: isSelected
           ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
           : highlightColor,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6), // 减小圆角
         side: isSelected
             ? BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5))
-            : BorderSide.none,
+            : BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
       ),
       child: InkWell(
         onTap: onTap,
@@ -79,16 +76,13 @@ class TopicCard extends ConsumerWidget {
             Opacity(
               opacity: isFullyRead ? 0.5 : 1.0,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 6), // 极限内部间距
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // 左侧：楼主头像
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: _buildOriginalPosterAvatar(context),
-                    ),
-                    const SizedBox(width: 10),
+                    _buildOriginalPosterAvatar(context),
+                    const SizedBox(width: 8),
                     // 右侧：两行内容
                     Expanded(
                       child: Column(
@@ -96,14 +90,14 @@ class TopicCard extends ConsumerWidget {
                         children: [
                           // 第1行：标题 + 回复数/未读数
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
                                 child: Text.rich(
                                   TextSpan(
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style: theme.textTheme.titleSmall?.copyWith(
                                       fontWeight: FontWeight.w600,
-                                      height: 1.3,
+                                      height: 1.2,
                                       color: isUnread
                                           ? theme.colorScheme.onSurface
                                           : theme.colorScheme.onSurfaceVariant,
@@ -114,25 +108,15 @@ class TopicCard extends ConsumerWidget {
                                           alignment: PlaceholderAlignment.middle,
                                           child: Padding(
                                             padding: const EdgeInsets.only(right: 4),
-                                            child: Icon(
-                                              Icons.lock_outline,
-                                              size: 16,
-                                              color: isUnread
-                                                  ? theme.colorScheme.onSurface
-                                                  : theme.colorScheme.onSurfaceVariant,
-                                            ),
+                                            child: Icon(Icons.lock_outline, size: 14, color: isUnread ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant),
                                           ),
                                         ),
                                       if (topic.hasAcceptedAnswer)
-                                        WidgetSpan(
+                                        const WidgetSpan(
                                           alignment: PlaceholderAlignment.middle,
                                           child: Padding(
-                                            padding: const EdgeInsets.only(right: 4),
-                                            child: Icon(
-                                              Icons.check_box,
-                                              size: 16,
-                                              color: Colors.green,
-                                            ),
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(Icons.check_box, size: 14, color: Colors.green),
                                           ),
                                         )
                                       else if (topic.canHaveAnswer)
@@ -140,28 +124,23 @@ class TopicCard extends ConsumerWidget {
                                           alignment: PlaceholderAlignment.middle,
                                           child: Padding(
                                             padding: const EdgeInsets.only(right: 4),
-                                            child: Icon(
-                                              Icons.check_box_outline_blank,
-                                              size: 16,
-                                              color: theme.colorScheme.outline,
-                                            ),
+                                            child: Icon(Icons.check_box_outline_blank, size: 14, color: theme.colorScheme.outline),
                                           ),
                                         ),
-                                      ...EmojiText.buildEmojiSpans(context, topic.title, theme.textTheme.titleMedium?.copyWith(
+                                      ...EmojiText.buildEmojiSpans(context, topic.title, theme.textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
-                                        height: 1.3,
+                                        height: 1.2,
                                         color: isUnread
                                             ? theme.colorScheme.onSurface
                                             : theme.colorScheme.onSurfaceVariant,
                                       )),
-                                      // 未读蓝点追加在标题末尾
                                       if (topic.unseen)
                                         WidgetSpan(
                                           alignment: PlaceholderAlignment.middle,
                                           child: Container(
-                                            margin: const EdgeInsets.only(left: 6),
-                                            width: 8,
-                                            height: 8,
+                                            margin: const EdgeInsets.only(left: 4),
+                                            width: 6,
+                                            height: 6,
                                             decoration: BoxDecoration(
                                               color: theme.colorScheme.primary,
                                               shape: BoxShape.circle,
@@ -170,30 +149,27 @@ class TopicCard extends ConsumerWidget {
                                         ),
                                     ],
                                   ),
-                                  maxLines: 2,
+                                  maxLines: 1, // 强制单行
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               // 右上角：回复数或未读数
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: _buildReplyOrUnread(context),
-                              ),
+                              _buildReplyOrUnread(context),
                             ],
                           ),
 
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 3), // 极限行间距
 
                           // 第2行：分类+标签（左） + 点赞+时间（右）
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               // 左侧：分类和标签
                               Expanded(
                                 child: Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
+                                  spacing: 4,
+                                  runSpacing: 2,
                                   children: [
                                     if (category != null)
                                       CategoryBadge(
@@ -213,18 +189,19 @@ class TopicCard extends ConsumerWidget {
                                 children: [
                                   if (topic.likeCount > 0) ...[
                                     _buildStat(context, Icons.favorite_border_rounded, topic.likeCount),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 4),
                                     Text(
                                       '·',
                                       style: theme.textTheme.labelSmall?.copyWith(
                                         color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 4),
                                   ],
                                   RelativeTimeText(
                                     dateTime: topic.lastPostedAt,
                                     style: theme.textTheme.labelSmall?.copyWith(
+                                      fontSize: 10,
                                       color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                                     ),
                                   ),
@@ -246,8 +223,7 @@ class TopicCard extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 ),
-                // 左侧 56 = 头像区 12+34+10，与主内容文字起始对齐
-                padding: const EdgeInsets.fromLTRB(56, 6, 14, 6),
+                padding: const EdgeInsets.fromLTRB(40, 4, 8, 4), // 适配缩小后的头像占位
                 child: bottomWidget!,
               ),
           ],
@@ -259,59 +235,59 @@ class TopicCard extends ConsumerWidget {
   /// 构建楼主头像
   Widget _buildOriginalPosterAvatar(BuildContext context) {
     final theme = Theme.of(context);
-    // 取第一个 poster（Original Poster）
+    const double avatarRadius = 12.0; // 头像缩小到 24x24
+
     if (topic.posters.isNotEmpty) {
       final op = topic.posters.first;
       if (op.user != null) {
         final avatarUrl = op.user!.avatarTemplate.startsWith('http')
-            ? op.user!.getAvatarUrl(size: 68)
-            : '${AppConstants.baseUrl}${op.user!.getAvatarUrl(size: 68)}';
+            ? op.user!.getAvatarUrl(size: 48)
+            : '${AppConstants.baseUrl}${op.user!.getAvatarUrl(size: 48)}';
         return SmartAvatar(
           imageUrl: avatarUrl,
-          radius: 17,
+          radius: avatarRadius,
           fallbackText: op.user!.username,
         );
       }
     }
-    // fallback：用 lastPosterUsername 首字母
+    // fallback
     if (topic.lastPosterUsername != null) {
       return CircleAvatar(
-        radius: 17,
+        radius: avatarRadius,
         backgroundColor: theme.colorScheme.secondaryContainer,
         child: Text(
           topic.lastPosterUsername![0].toUpperCase(),
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 11,
             fontWeight: FontWeight.w600,
             color: theme.colorScheme.onSecondaryContainer,
           ),
         ),
       );
     }
-    return const SizedBox(width: 34, height: 34);
+    return const SizedBox(width: avatarRadius * 2, height: avatarRadius * 2);
   }
 
   /// 回复数/未读数切换
   Widget _buildReplyOrUnread(BuildContext context) {
     final theme = Theme.of(context);
     if (topic.unread > 0) {
-      // 未读数：主题色圆角徽章
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
         decoration: BoxDecoration(
           color: theme.colorScheme.primary,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           '${topic.unread}',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onPrimary,
             fontWeight: FontWeight.w600,
+            fontSize: 10,
           ),
         ),
       );
     } else {
-      // 回复数：带热度颜色
       final replies = (topic.postsCount - 1).clamp(0, 999999);
       if (replies <= 0) return const SizedBox.shrink();
       final heatColor = _replyHeatColor(topic, theme);
@@ -334,10 +310,10 @@ class TopicCard extends ConsumerWidget {
   /// 回复数热度颜色
   Color? _replyHeatColor(Topic topic, ThemeData theme) {
     final ratio = _heatRatio(topic);
-    if (ratio > 2.0) return const Color(0xFFFE7A15); // 高热度-橙色
-    if (ratio > 1.0) return const Color(0xFFCF7721); // 中热度-暗橙色
-    if (ratio > 0.5) return const Color(0xFF9B764F); // 低热度-褐色
-    return null; // 默认颜色
+    if (ratio > 2.0) return const Color(0xFFFE7A15);
+    if (ratio > 1.0) return const Color(0xFFCF7721);
+    if (ratio > 0.5) return const Color(0xFF9B764F);
+    return null;
   }
 
   Widget _buildStat(BuildContext context, IconData icon, int count, {Color? color, bool bold = false}) {
@@ -346,12 +322,13 @@ class TopicCard extends ConsumerWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: effectiveColor),
-        const SizedBox(width: 3),
+        Icon(icon, size: 12, color: effectiveColor),
+        const SizedBox(width: 2),
         Text(
           NumberUtils.formatCount(count),
           style: theme.textTheme.labelSmall?.copyWith(
             color: effectiveColor,
+            fontSize: 11,
             fontWeight: bold ? FontWeight.w700 : null,
           ),
         ),
@@ -360,7 +337,7 @@ class TopicCard extends ConsumerWidget {
   }
 }
 
-/// 紧凑型话题卡片 - 用于置顶话题
+/// 紧凑型话题卡片 - 用于置顶话题 (同步极限瘦身)
 class CompactTopicCard extends ConsumerWidget {
   final Topic topic;
   final VoidCallback? onTap;
@@ -398,57 +375,46 @@ class CompactTopicCard extends ConsumerWidget {
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 1), // 极限外部间距
       clipBehavior: Clip.antiAlias,
+      elevation: 0,
       color: isSelected
           ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
           : highlightColor ?? theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6), // 减小圆角
         side: isSelected
             ? BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5))
-            : BorderSide.none,
+            : BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
       ),
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // 极限内部间距
           child: Row(
             children: [
               // 1. 置顶图标
-              Icon(
-                Icons.push_pin_rounded,
-                size: 14,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
+              Icon(Icons.push_pin_rounded, size: 12, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
 
               // 2. 分类图标/Dot
               if (category != null) ...[
                 if (faIcon != null)
-                  FaIcon(
-                    faIcon,
-                    size: 12,
-                    color: _parseColor(category.color),
-                  )
+                  FaIcon(faIcon, size: 10, color: _parseColor(category.color))
                 else if (logoUrl != null && logoUrl.isNotEmpty)
                   Image(
                     image: discourseImageProvider(
-                      logoUrl.startsWith('http')
-                          ? logoUrl
-                          : '${AppConstants.baseUrl}$logoUrl',
+                      logoUrl.startsWith('http') ? logoUrl : '${AppConstants.baseUrl}$logoUrl',
                     ),
-                    width: 12,
-                    height: 12,
+                    width: 10,
+                    height: 10,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return _buildCategoryDot(category);
-                    },
+                    errorBuilder: (context, error, stackTrace) => _buildCategoryDot(category),
                   )
                 else
                   _buildCategoryDot(category),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
               ],
 
               // 3. 标题
@@ -465,23 +431,15 @@ class CompactTopicCard extends ConsumerWidget {
                           alignment: PlaceholderAlignment.middle,
                           child: Padding(
                             padding: const EdgeInsets.only(right: 3),
-                            child: Icon(
-                              Icons.lock_outline,
-                              size: 12,
-                              color: isUnread ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant,
-                            ),
+                            child: Icon(Icons.lock_outline, size: 10, color: isUnread ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant),
                           ),
                         ),
                       if (topic.hasAcceptedAnswer)
-                        WidgetSpan(
+                        const WidgetSpan(
                           alignment: PlaceholderAlignment.middle,
                           child: Padding(
-                            padding: const EdgeInsets.only(right: 3),
-                            child: Icon(
-                              Icons.check_box,
-                              size: 12,
-                              color: Colors.green,
-                            ),
+                            padding: EdgeInsets.only(right: 3),
+                            child: Icon(Icons.check_box, size: 10, color: Colors.green),
                           ),
                         )
                       else if (topic.canHaveAnswer)
@@ -489,11 +447,7 @@ class CompactTopicCard extends ConsumerWidget {
                           alignment: PlaceholderAlignment.middle,
                           child: Padding(
                             padding: const EdgeInsets.only(right: 3),
-                            child: Icon(
-                              Icons.check_box_outline_blank,
-                              size: 12,
-                              color: theme.colorScheme.outline,
-                            ),
+                            child: Icon(Icons.check_box_outline_blank, size: 10, color: theme.colorScheme.outline),
                           ),
                         ),
                       ...EmojiText.buildEmojiSpans(context, topic.title, theme.textTheme.labelMedium?.copyWith(
@@ -502,40 +456,40 @@ class CompactTopicCard extends ConsumerWidget {
                       )),
                     ],
                   ),
-                  maxLines: 1,
+                  maxLines: 1, // 置顶帖也保持绝对单行
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
 
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // 4. 未读数或简单状态
               if (topic.unread > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${topic.unread}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.w600,
-                      fontSize: 9,
+                      fontSize: 8,
                     ),
                   ),
                 )
               else if (topic.postsCount > 1)
                  Row(
                    children: [
-                     Icon(Icons.chat_bubble_outline_rounded, size: 12, color: theme.colorScheme.outline.withValues(alpha: 0.7)),
+                     Icon(Icons.chat_bubble_outline_rounded, size: 10, color: theme.colorScheme.outline.withValues(alpha: 0.7)),
                      const SizedBox(width: 2),
                      Text(
                         '${topic.postsCount - 1}',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: theme.colorScheme.outline.withValues(alpha: 0.7),
-                          fontSize: 10,
+                          fontSize: 9,
                         ),
                      ),
                    ],
@@ -549,8 +503,8 @@ class CompactTopicCard extends ConsumerWidget {
 
   Widget _buildCategoryDot(Category category) {
     return Container(
-      width: 6,
-      height: 6,
+      width: 5,
+      height: 5,
       decoration: BoxDecoration(
         color: _parseColor(category.color),
         shape: BoxShape.circle,
